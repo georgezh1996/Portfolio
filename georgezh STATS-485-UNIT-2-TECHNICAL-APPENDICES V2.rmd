@@ -1,0 +1,234 @@
+---
+title: "Unit 2 Paper, Technical Appendices Version 2"
+author: "George Zhou"
+date: "March 22, 2019"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+### Overview
+
+The goal for this appendix is to investigate the appropriateness of the supra-linear model and look at other possible models that uses economnic sectors as predictors for GMP per capita. Methods such as in-loss sampling, 5 CV, and using holdout data are used. 
+
+**External Requirements**
+
+```{r echo = T}
+library(tidyverse)
+library(lindia)
+library(lmvar)
+library(gridExtra)
+dat = read.csv("http://dept.stat.lsa.umich.edu/~bbh/s485/data/gmp-2006.csv")
+#holdout data
+dath = read.csv("http://dept.stat.lsa.umich.edu/~bbh/s485/data/gmp-2006-holdout.csv")
+```
+
+### Appendix I: Detail of statistical models
+
+The purpose of this section is to justify the log transformation in the analysis. 
+
+**1. Proof log transformations**
+Suppose:
+
+$Y\approx cN^b$ Then:
+
+$Y/N\approx cN^{b-1}$. It follows then that:
+
+$log(Y/N)\approx log(c)+(b-1)log(N)$
+
+Let $\beta_0=log(c)$ and $\beta_1=b-1$. Then
+
+$log(Y/N) \approx \beta_0 + \beta_1log(N)$. This also means:
+
+$log(Y) = \beta_0 +(\beta_1 +1)log(N)$ 
+
+For some $\beta_0$ and $\beta_1>0$. 
+
+**2. Hypothesises for GMP per capita**
+
+The purpose of this section is to suggest potential hypothesis 
+for the research question.
+
+*1.* One hypothesis for GMP is that it can be predicted between in the interaction of communication and technology (ICT) with the other variables. Cities that are considered "modern" may attract more people to come live in those areas. As more people come to these types of cities, there will be more investment in those cities in terms of professional and technical services, finance. These cities will then become powerhouses in creating revenue. The investment of these cities will increase much faster than the population, which will show an superlinear increase in GMP per capita 
+
+*2.* A second hypothesis maybe due to high finance. Big finance cities are cities that people just have a higher affinity than other cities. Because of these biases towards these areas, unproportionately, investments such as technology will handed to these areas. More people will be willing to live in these places, as they are seen as places of opportunities. Again, these investments will increase GMP much faster than population, resulting a superlinear increase in GMP per capita.   
+
+
+### Appendix II: Exploratory analyses
+
+The purpose of this section is to look into the data for important information before any real data analysis. 
+
+**1. create additional variables needed**
+```{r}
+#Create GMP variable
+dat = dat%>%mutate(gmp  = 1/1000000*pcgmp*pop)
+dath = dath%>%mutate(gmp  = 1/1000000*pcgmp*pop)
+```
+
+**2. Find missing value proportions for each variable and joint missingness**
+```{r}
+proportion=sapply(4:7, function(i) sapply(4:7, function(j) mean(complete.cases(dat[i], dat[j]))))
+colnames(proportion)=colnames(dat)[4:7]
+rownames(proportion)=colnames(dat)[4:7]
+knitr::kable(proportion)
+```
+
+**3. Scatter plots for  GMP vs population size, of log GMP vs population, of GMP vs log population and of log GMP vs log population size**
+```{r}
+w=ggplot(dat, mapping = aes(pop, gmp))+geom_point()+ggtitle("Population vs GMP")+xlab("Population")+ylab("GMP")+theme_minimal()+geom_smooth(se=F)
+x=ggplot(dat, mapping = aes(pop, log(gmp)))+geom_point()+ggtitle("Population vs log GMP")+ylab("log GMP")+xlab("Population")+theme_minimal()+geom_smooth(se=F)
+y=ggplot(dat,aes(log(pop), gmp))+geom_point()+ggtitle("log Population vs GMP")+ylab("GMP")+xlab("log Population")+theme_minimal()+geom_smooth(se=F)
+z=ggplot(dat,aes(log(pop), log(gmp)))+geom_point()+ggtitle("log Population vs log GMP")+ylab("log GMP")+xlab("log Population")+theme_minimal()+geom_smooth(se=F)
+grid.arrange(w,x,y,z)
+```
+
+Log pop and Log GMP seem to be the best scale to capture patterns. 
+
+**4. Pick preferred model, add differences based on other variables**
+```{r}
+dat1 = dat%>%filter(!is.na(finance))
+ggplot(dat1,mapping =aes(x=log(pop), y=log(gmp), color =finance))+geom_point()+
+  ggtitle("log Population vs log GMP")+
+  ylab("log GMP")+xlab("log Population")+theme_minimal()+scale_color_gradient(low = "purple", high = "yellow")+ stat_smooth(geom='line', alpha=0.5, se=FALSE)
+```
+
+Seems like higher finance coincides with higher log gmp and log population
+
+### Appendix III: Fitting the power law model
+
+The purpose of this section is to analyze the supra-linear model when predicting for GMP.
+
+**1. Regress log GMP on log Population** 
+```{r}
+model = lm(log(gmp)~log(pop), data = dat)
+summary(model)
+```
+This fits the supra-linear power-law hypothesis, where $\hat\beta_1$= 1.12326-1= .12326 and $\hat\beta_0$ = -5.01928
+
+**2. Plot residual plot to see if residuals is homoskedastic **
+```{r}
+plot1=dat%>%mutate(fitted_values=fitted.values(model), residuals=model$residuals)%>%ggplot(mapping = aes(x=fitted_values, y = residuals))+geom_point()+geom_smooth(se=F)+geom_hline(yintercept=0)+theme_minimal()+ggtitle("Residual Plot")+xlab("fitted values")
+plot1
+```
+
+**3. Squared-error loss**
+```{r}
+mean(model$residuals^2)%>%signif(digits=3)
+
+#ransformation of log(gmp), where both are the same value of error loss
+mean(((log(dat$gmp)-log(dat$pop))-(fitted.values(model)-log(dat$pop)))^2)
+
+```
+
+**4.5-Fold Cross Validation**
+```{r}
+set.seed(3)
+#CV function
+cv.lm <- function(data, formulae, nfolds = 5) {
+  data <- na.omit(data)
+  formulae <- sapply(formulae, as.formula)
+  n <- nrow(data)
+  fold.labels <- sample(rep(1:nfolds, length.out = n))
+  mses <- matrix(NA, nrow = nfolds, ncol = length(formulae))
+  colnames <- as.character(formulae)
+  for (fold in 1:nfolds) {
+    test.rows <- which(fold.labels == fold)
+    train <- data[-test.rows, ]
+    test <- data[test.rows, ]
+    for (form in 1:length(formulae)) {
+      current.model <- lm(formula = formulae[[form]], data = train)
+      predictions <- predict(current.model, newdata = test)
+      test.responses <- eval(formulae[[form]][[2]], envir = test)
+      test.errors <- test.responses - predictions
+      mses[fold, form] <- mean(test.errors^2)
+    }
+  }
+return(colMeans(mses))
+}
+
+m=cv.lm(dat, "log(gmp)~log(pop)")%>%signif(digits=3)
+m
+```
+
+### Appendix IV: Fitting and assessment of alternate models
+
+The purpose of this section is study the effectiveness of alternate models for GMP per capita, while also comparing to there effectiveness to the supra-linear model
+
+**1. Suggest new models**
+```{r}
+#alternate
+formula1="log(gmp)~ict"
+formula2="log(gmp)~finance"
+formula3="log(gmp)~finance+ict"
+
+#nested alternate models
+formula4="log(gmp)~log(pop)+ict"
+formula5="log(gmp)~log(pop)+finance"
+formula6="log(gmp)~log(pop)+finance+ict"
+```
+
+**2. Fit alternate models**
+```{r}
+#omit missing data
+newdat = dat%>%filter(!is.na(finance)&!is.na(ict))
+
+newmod = lm(log(pcgmp)~log(pop),newdat) #supra linear model
+model1 = lm(as.formula(formula1), newdat) #ict
+model2 = lm(as.formula(formula2), newdat) #finance
+model3=lm(as.formula(formula3), newdat) #ict/finance
+model4 = lm(as.formula(formula4), newdat) #nested ict
+model5 = lm(as.formula(formula5), newdat) #nested finance
+model6=lm(as.formula(formula6), newdat) #nested ict/finance
+```
+
+**3. Calculate in loss error and 5 folds cv error for alternate models**
+```{r}
+set.seed(3)
+#loss error
+loss=mean(newmod$residuals^2)%>%signif(digits=3)%>%print() #supra-linear model
+loss1=mean(model1$residuals^2)%>%signif(digits=3)%>%print()  #ict
+loss2=mean(model2$residuals^2)%>%signif(digits=3)%>%print()  #finance
+loss3=mean(model3$residuals^2)%>%signif(digits=3)%>%print()  #ict/finance
+loss4=mean(model4$residuals^2)%>%signif(digits=3)%>%print()  #nested ict
+loss5=mean(model5$residuals^2)%>%signif(digits=3)%>%print()  #nested finance
+loss6=mean(model6$residuals^2)%>%signif(digits=3)%>%print() #nested ict/finance
+
+#5 folds cv error
+mnewcv = cv.lm(newdat, "log(pcgmp)~log(pop)")%>%signif(digits=3)%>%print() #supra-linear model
+mcv1=cv.lm(newdat, formula1)%>%signif(digits=3)%>%print() #ict
+mcv2=cv.lm(newdat, formula2)%>%signif(digits=3)%>%print() #finance
+mcv3=cv.lm(newdat, formula3)%>%signif(digits=3)%>%print() #ict/finance
+mcv4=cv.lm(newdat, formula4)%>%signif(digits=3)%>%print() #nested ict
+mcv5=cv.lm(newdat, formula5)%>%signif(digits=3)%>%print() #nested finance
+mcv6=cv.lm(newdat, formula6)%>%signif(digits=3)%>%print() #nested ict/finance
+
+```
+
+**5. Addtional: Assessing the supra-linear model using a formal hypothesis**
+```{r}
+#using holdout data, omitting NAs
+newdath = dath%>%filter(!is.na(finance)&!is.na(ict))
+
+model3h = lm(log(gmp)~ict+finance,newdath) #supra linear model
+model6h = lm(log(gmp)~ict+finance+log(pop), newdath) #nested ict/finance
+
+#ANOVA TEST
+anova(model3h, model6h)
+
+#Check requirements for supralinear model
+summary(model6h)
+```
+
+$\hat\beta_1>0$ and there is a $\hat\beta_0$.
+
+### Appendix V: Miscellaneous#
+
+**1. Table for models and error**
+```{r}
+results=data.frame(models = c("Supra Linear Model", "ICT", "Finance", "Finance and ICT", "Nested ICT", "Nested Finance", "Nested Finance and ICT"), samploss = c(loss, loss1, loss2, loss3, loss4, loss5, loss6), cv5 = c(mnewcv, mcv1, mcv2, mcv3, mcv4, mcv5, mcv6))
+colnames(results)=c("Models", "In-Sample Loss Error", "5 CV Error")
+knitr::kable(results)
+```
+
+
+
