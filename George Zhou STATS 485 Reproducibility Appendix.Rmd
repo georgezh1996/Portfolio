@@ -1,0 +1,106 @@
+---
+title: "STATS 485 Unit 1 Version 1 Paper Reproducibility Appendix"
+author: "George Zhou"
+date: "January 19, 2019"
+output:
+  html_document: default
+  word_document: default
+---
+#Overview
+The purpose of this appendix is to calculate the Agresti-Coull Confidence intervals for upward mobility of the 40 commuting zones in the United States, and find the upward mobility rate of the four geographical units and see if there is a true difference among them. 
+
+#Setup 
+We use the necessary packages, and download the data. 
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(gridExtra)
+library(kableExtra)
+mydata = read.csv("http://dept.stat.lsa.umich.edu/~bbh/s485/data/mobility3.csv")
+```
+
+#Agresti Confidence Interval + Visualization
+The purpose of these blocks are to create a function that will calculate Agresti-Coull 95% CI for upward mobility of the 40 commuting zones. We also create a visualiziation of the CI. 
+```{r}
+k = 1.96
+ac_ci = function(phat, n){
+ X = round(phat*n)
+ Xt=X+(k^2/2)
+ nt=n+k^2
+ pt = Xt/nt
+ lwr = pt -1.96*(pt*(1-pt))^.5*n^(-.5)
+ uppr= pt +1.96*(pt*(1-pt))^.5*n^(-.5)
+ if(lwr <0){
+   lwr = 0
+ }
+ if(uppr >1){
+   uppr = 1
+ }
+ return(signif(c(lwr, uppr), digits=3))
+}
+
+
+#testcases
+ac_ci(1, 10)
+ac_ci(0, 20)
+
+#CI for commuting zones 
+a_ci=map(1:40, function(i) ac_ci(mydata$p.upmover[i], mydata$n.lowstart[i]))
+a_ci = matrix(a_ci%>%unlist(), nrow = 40, byrow=T)
+colnames(a_ci)=c("lowerbound", "upperbound")
+mydata1 = data.frame(mydata, a_ci)
+table1=mydata1%>%select(zone, region, lowerbound, upperbound)
+knitr::kable(table1)
+```
+
+The function for creating the graphs. 
+```{r}
+ci_graph =function(reg, color1, color2){
+  graph = ggplot(data = mydata1%>%
+                   filter(region == reg), aes(x=zone, y = p.upmover)) + 
+    geom_errorbar(mapping = aes(ymin = lowerbound, ymax = upperbound, width =0), colour = color1)+
+    geom_point(size = 3, colour = color2)+xlab("Zone")+ylab("Upward Mobility")+
+    ggtitle(str_c("Upward Mobility in ", str_to_title(reg), " Region"))+theme_minimal()+coord_flip()
+  return(graph)
+}
+west = ci_graph("west", "seagreen3", "seagreen4")
+midwest = ci_graph("midwest", "chocolate2", "chocolate3")
+northeast= ci_graph("northeast", "skyblue2", "steelblue2")
+south = ci_graph("south", "red2", "red3")
+
+grid.arrange(midwest, northeast, south, west, ncol = 2)
+```
+
+#Likelihood Ratio Test and Visualization for difference among 4 regions
+The purpose of these blocks is to calculate the upward mobility for the 4 geographical regions, visualize upward mobility based on their geographical regions, and conduct a likelihood ratio test to see if there is a difference among the regions. 
+```{r}
+ggplot(data = mydata1, mapping = aes(y = p.upmover, x = region, alpha = .4, fill = region)) +geom_boxplot()+ scale_fill_manual(values = c("chocolate2",  "skyblue2","red2", "seagreen2"))+theme_minimal()+theme(legend.position = "none")+ggtitle("Upward Mobility based on Geographical Region")+ylab("Upward Mobility")+xlab("Region")
+```
+
+```{r}
+table2 = mydata1%>%group_by(region)%>%summarize(p = signif(sum(n.lowstart*p.upmover)/sum(n.lowstart), digits = 3), n = sum(n.lowstart))%>%mutate(region = str_to_title(region))
+knitr::kable(table2)%>%kable_styling(bootstrap_options = "striped")
+```
+
+We use likelihood ratio test to see if the proportions among the regions are the same. 
+```{r}
+log_lik = function(p) {
+ val = sum (dbinom(n_z*p_ind, size=n_z, prob=p, log=T))
+ return(val)
+}
+
+n_z = mydata%>%group_by(region)%>%summarize(n = sum(n.lowstart))%>%pull(n)
+#common proportion 
+p_all = sum(mydata$p.upmover*mydata$n.lowstart)/sum(n_z) 
+#proportion for each Region
+p_ind=mydata1%>%group_by(region)%>%mutate(x = p.upmover*n.lowstart)%>%summarize(phat=sum(x)/sum(n.lowstart), sum(n.lowstart))%>%pull(phat)
+#test statistic 
+2*(log_lik(p_ind)-log_lik(sum(p_all*n_z)/sum(n_z)))
+qchisq(.95, 3)
+#pvalue 
+pchisq(8.48, 3, lower.tail = F)
+```
+
+
+
+
