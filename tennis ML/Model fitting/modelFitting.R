@@ -3,8 +3,9 @@ library(leaps)
 library(ISLR)
 library(MASS)
 library(tree)
+library(caret)
 atpMatchesClean=read_rds('atpMatchesClean.RDS')
-#create variable to show if servers faced break point or not 
+#change winner to binary variable 
 atpMatchesClean<-atpMatchesClean %>% mutate(winner=ifelse(winner==1,1,0)) 
   mutate(winner=factor(winner))
 
@@ -75,11 +76,14 @@ coefsDiffResults<-modelEvaluation(coefsDiff,atpMatchesDiff,trainIndex)
 coefsNoDiffResults<-modelEvaluation(coefsNoDiff,atpMatchesNoDiff,trainIndex)
 coefsBothResults<-modelEvaluation(coefsBoth,atpMatchesCleanBoth,trainIndex)
 
+#results put together 
 results<-rbind(coefsDiffResults,coefsNoDiffResults,coefsBothResults)
 results<-data.frame(nVar=c(8,15,9),results)
 row.names(results)<-c('Difference Only','Individual Stats','Both')
 knitr::kable(results)
 
-
-
+#variable importance
+formDiff<-str_c('winner~',str_c(names(coefsDiff)[-1],collapse = '+'),collapse = "") %>% formula()
+modDiff<-glm(formDiff,data = atpMatchesDiff,subset = trainIndex,family = 'binomial')
+varImp(modDiff,scale=FALSE)
 
