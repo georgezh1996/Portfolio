@@ -6,7 +6,7 @@ library(tree)
 library(caret)
 atpMatchesClean=read_rds('atpMatchesClean.RDS')
 #change winner to binary variable 
-atpMatchesClean<-atpMatchesClean %>% mutate(winner=ifelse(winner==1,1,0)) 
+atpMatchesClean<-atpMatchesClean %>% mutate(winner=ifelse(winner==1,1,0)) %>%
   mutate(winner=factor(winner))
 
 #diff
