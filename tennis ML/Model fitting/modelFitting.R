@@ -37,7 +37,6 @@ modelCoefficients<-function(regFit){
   bicResults=data.frame(nVar=1:length(summary(regFit)$cp),BIC=summary(regFit)$bic)
   nCoef<-which(bicResults$BIC==min(bicResults$BIC))
   return(coef(regFit,nCoef))
-  print(graph1)
 }
 #evaluate based on types of models used 
 modelEvaluation<-function(coefs,df,index){
