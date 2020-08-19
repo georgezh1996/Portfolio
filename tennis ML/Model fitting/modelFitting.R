@@ -3,7 +3,7 @@ library(leaps)
 library(ISLR)
 library(MASS)
 library(tree)
-library(caret)
+library(dominanceanalysis)
 atpMatchesClean=read_rds('atpMatchesClean.RDS')
 #change winner to binary variable 
 atpMatchesClean<-atpMatchesClean %>% mutate(winner=ifelse(winner==1,1,0)) %>%
@@ -82,7 +82,19 @@ row.names(results)<-c('Difference Only','Individual Stats','Both')
 knitr::kable(results)
 
 #variable importance
-formDiff<-str_c('winner~',str_c(names(coefsDiff)[-1],collapse = '+'),collapse = "") %>% formula()
-modDiff<-glm(formDiff,data = atpMatchesDiff,subset = trainIndex,family = 'binomial')
-varImp(modDiff,scale=FALSE)
+formDiff<-str_c('winner~',str_c(names(coefsDiff)[-c(1)],collapse = '+'),collapse = "") %>% formula()
+modDiff<-glm(formDiff,data=atpMatchesDiff[trainIndex,],family = 'binomial')
+dapres<-dominanceAnalysis(modDiff)
+plot(dapres, which.graph ="general",fit.function = "r2.m")+coord_flip()+theme(legend.position = 'none')+scale_color_discrete(values='red4')
+
+#get rid of unreturnal serves in model 
+formDiffnoRet<-str_c('winner~',str_c(names(coefsDiff)[-c(1,9)],collapse = '+'),collapse = "") %>% formula()
+modDiffNoRet<-glm(formDiffnoRet,data=atpMatchesDiff[trainIndex,],family = 'binomial')
+
+coef(modDiff)
+#no unreturnable serve variable
+coef(modDiffNoRet)
+
+
+
 
