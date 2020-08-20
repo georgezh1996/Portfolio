@@ -84,9 +84,14 @@ knitr::kable(results)
 #variable importance
 formDiff<-str_c('winner~',str_c(names(coefsDiff)[-c(1)],collapse = '+'),collapse = "") %>% formula()
 modDiff<-glm(formDiff,data=atpMatchesDiff[trainIndex,],family = 'binomial')
-dapres<-dominanceAnalysis(modDiff)
-plot(dapres, which.graph ="general",fit.function = "r2.m")+coord_flip()+theme(legend.position = 'none')+scale_color_discrete(values='red4')
-
+x=dapres$contribution.average[[1]]
+df<-data.frame(stats=names(x),r2.m=x)
+df %>% mutate(stats=fct_reorder(stats,r2.m)) %>% 
+  ggplot(aes(x=stats,y=r2.m))+
+  geom_col(color='black',fill='red4')+
+  coord_flip()+
+  ggtitle('Dominance of Tennis Stats')+
+  theme_light()
 #get rid of unreturnal serves in model 
 formDiffnoRet<-str_c('winner~',str_c(names(coefsDiff)[-c(1,9)],collapse = '+'),collapse = "") %>% formula()
 modDiffNoRet<-glm(formDiffnoRet,data=atpMatchesDiff[trainIndex,],family = 'binomial')
