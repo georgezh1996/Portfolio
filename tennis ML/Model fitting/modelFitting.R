@@ -19,9 +19,7 @@ linDep<-c('match_id','loser','retFstWon','retSndWon','points','bkPtsSave','netPt
 atpMatchesNoDiff<-atpMatchesClean %>% 
   dplyr::select(-contains(c('diff',linDep)))
 
-#both diff and no diff
-atpMatchesCleanBoth<-atpMatchesClean %>% dplyr::select(-contains(linDep))
-set.seed(2019)
+set.seed(10000)
 
 #training index
 trainIndex<-sample(1:nrow(atpMatchesDiff),trunc(.8*nrow(atpMatchesDiff)))
@@ -58,32 +56,50 @@ modelEvaluation<-function(coefs,df,index){
   qdaResults<-mean(qdaPredict==df$winner[-index])
   treeResults<-mean(treePredict==df$winner[-index])
   
-  error<-round(1-c(logResults,ldaResults,qdaResults,treeResults),3)
+  error<-round(1-c(logResults,ldaResults,qdaResults,treeResults),5)
   names(error)<-c('Logistic','LDA','QDA','DecisionTree')
   return(error)
 }
 #gather coefficients
 regFitDiff<-models(atpMatchesDiff,trainIndex,'exhaustive')
 regFitNoDiff<-models(atpMatchesNoDiff,trainIndex,'forward')
-regFitBoth<-models(atpMatchesCleanBoth,trainIndex,'forward')
+
 #find coefficients
 coefsDiff<-modelCoefficients(regFitDiff)
 coefsNoDiff<-modelCoefficients(regFitNoDiff)
-coefsBoth<-modelCoefficients(regFitBoth)
+
 #fit and evaluate models 
 coefsDiffResults<-modelEvaluation(coefsDiff,atpMatchesDiff,trainIndex)
 coefsNoDiffResults<-modelEvaluation(coefsNoDiff,atpMatchesNoDiff,trainIndex)
-coefsBothResults<-modelEvaluation(coefsBoth,atpMatchesCleanBoth,trainIndex)
+
+
+coefsDiffResults
+
 
 #results put together 
-results<-rbind(coefsDiffResults,coefsNoDiffResults,coefsBothResults)
-results<-data.frame(nVar=c(8,15,9),results)
-row.names(results)<-c('Difference Only','Individual Stats','Both')
+results<-rbind(coefsDiffResults,coefsNoDiffResults)
+results<-data.frame(nVar=c(8,15),results)
+row.names(results)<-c('Difference Only','Individual Stats')
 knitr::kable(results)
 
+
+atpMatchesClean$fstSvPctDiff
+#let's look at why serve results are negative
+#final model 
+atpMatchesClean$fstSvPctDiff
+model1<-glm(winner~fstSvPctDiff+winDiff+sndSvWonDiff+unRetDiff+UEdiff+forcedPointsDiff,data=atpMatchesDiff,subset = trainIndex,family = 'binomial')
+summary(model1)
+pred<-round(predict(model1,atpMatchesClean[-trainIndex,],type = 'response'))
+1-mean(pred==atpMatchesNoDiff$winner[-trainIndex])
+coefsFinal<-coef(model1)
+
+coefsFinalResults<-modelEvaluation(coefsFinal,atpMatchesDiff,trainIndex)
+coefsFinalResults
+
 #variable importance
-formDiff<-str_c('winner~',str_c(names(coefsDiff)[-c(1)],collapse = '+'),collapse = "") %>% formula()
+formDiff<-str_c('winner~',str_c(names(coefsFinal)[-c(1)],collapse = '+'),collapse = "") %>% formula()
 modDiff<-glm(formDiff,data=atpMatchesDiff[trainIndex,],family = 'binomial')
+dapres<-dominanceAnalysis(modDiff)
 x=dapres$contribution.average[[1]]
 df<-data.frame(stats=names(x),r2.m=x)
 df %>% mutate(stats=fct_reorder(stats,r2.m)) %>% 
@@ -92,14 +108,3 @@ df %>% mutate(stats=fct_reorder(stats,r2.m)) %>%
   coord_flip()+
   ggtitle('Dominance of Tennis Stats')+
   theme_light()
-#get rid of unreturnal serves in model 
-formDiffnoRet<-str_c('winner~',str_c(names(coefsDiff)[-c(1,9)],collapse = '+'),collapse = "") %>% formula()
-modDiffNoRet<-glm(formDiffnoRet,data=atpMatchesDiff[trainIndex,],family = 'binomial')
-
-coef(modDiff)
-#no unreturnable serve variable
-coef(modDiffNoRet)
-
-
-
-
