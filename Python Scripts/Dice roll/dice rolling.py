@@ -2,7 +2,6 @@
 """
 Spyder Editor
 
-This is a temporary script file.
 """
 from random import *
 
@@ -25,6 +24,7 @@ def dice_roll():
             done=True
             print('Thank you for using our program!')
         elif choice=='1':
+            #added several cases for "yes" for usability 
             while done1 in ['Yes','Y','yes','y']:
                 num=randint(1, 6)
                 print('You rolled a: %d \n' % num)
