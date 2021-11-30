@@ -1,0 +1,277 @@
+---
+title: "Data Visualization Introduction"
+author: "George Zhou"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: true
+---
+### _"Facts are stubborn things, but statistics are pliable."_
+  -- Mark Twain 
+  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(gridExtra)
+library(ggpattern)
+library(maps)
+library(socviz)
+library(ggthemes)
+library(gapminder)
+library(scales)
+options(htmltools.dir.version = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, error = FALSE,
+                      warning = FALSE, fig.width = 10, fig.height = 8,fig.align = 'center')
+```
+
+  
+## Introduction
+
+A typical work meeting may involve these banal occurrences: The gregarious greetings, the precis of what will be covered in the meeting, and the intriguing discussion. All very conventional things as you are steadfast in your contribution to said meeting. However, as the discussion continues, the enigmatic data analyst whips out a graph that shows quarterly trends of your company's performance onto the projector. Immediately, eyes dart to the simple, but pithy graph that lucidly summarizes the strengths and weaknesses the company had in this quarter. 
+
+You are fascinated at the effectiveness and aesthetics of this graph. You wonder if the graph was easy to create, or such effort in creating these visualizations was an archaic and onerous skill. Fortunately, your friendly data analyst has offered to create a document that serves as a guide in making these graphs. It would probably look like this. 
+
+The example above was an example of a data visualization. At its core, __data visualization__ is the practice of displaying data visually (duh!). By focusing on visual cues, effective graphical representations of data can be effectively understood and uncover interesting patterns and trends.
+
+Again, this document will serve as a guide in creating efficacious visualizations. Hopefully reading some of the tips and advice in this document will help make creating graphs and charts an enjoyable and productive experience!
+
+## The Big 3  {.tabset .tabset-fade}
+
+When creating data visualization, there are three concepts to keep in mind: 
+
+* Aesthetics
+* Substance
+* Perception
+
+### Aesthetics
+
+_"In so far as the mind sees things in their eternal aspect, it participates in eternity"_
+  - Baruch de Spinoza
+  
+Aesthetics is concerned with the stylistic choices to enhance the appearance of something. This is a very important feature that many people may neglect when creating data visualizations. Since graphs, charts, and other graphical representations of data are inherently a visual experience, it is important for those to be aesthetically pleasing (or at least passable in appearance). For example:
+
+```{r}
+df=tibble(x=c('Zach','Sam','Amanda','Jesse','Tim','Dan','John','Danielle','Dom'),y=c(-4,15,2,-9,3,6,-10,1,2))
+
+p<-ggplot(df,aes(x=x,y=y))+geom_col_pattern(aes(pattern=x,pattern_angle=x,pattern_spacing=x,color=x),fill='grey')+
+  labs(x='Student',y='Grade Change',title = 'Grade Change by Student',caption = 'Disclaimer: Fabricated Data')
+
+p1<-ggplot(df,aes(x=reorder(x,y),y=y))+geom_col(aes(fill=y>0),color='black')+
+  labs(x='Student',y='Grade Change',title = 'Grade Change by Student',caption = 'Disclaimer: Fabricated Data')+
+  coord_flip()+theme_minimal()+theme(legend.position = 'none')+
+  scale_fill_manual(values = c('steelblue1','red4'))
+grid.arrange(p,p1,nrow=1)
+```
+
+Both graphs shows the same information: grade change for students. There are some qualms regarding the first graph. The bars are of a gray color that blends in with the background. The patterns of the bars are reminiscence of those ugly sweaters you would wear for Christmas. There is a redundant legend that serves as another eye sore. The graph is also "non ordered", which makes the overall shape of the graph a bit amorphous. 
+
+The second graph on the other hand appears much clearer and easier on the eye. The graph is ordered from greatest positive change to greatest negative change, while also flipped to further show difference in grade change. And the colors of the bars pop out from the minimalistic background in a way that is not displeasing. 
+
+Based on these observations, it can be suggested that the second graph looks better than the first one. What is important regarding aesthetics of a graph is that it elicit the audience to __actually__ look at a graph. No wants to look at a convoluted/disfigured graph when trying to infer something out of it. It is better to err on the cleaner and simpler side in terms of aesthetics. 
+
+### Substance
+
+_“Two half truths don't make one truth.”_
+  --Joseph Julius Bonkowski Jr
+
+Substance pertains to what the actual data constitutes, and how to accurately portray it. There are a multitude of ways to represent data, however not each way is the correct way. 
+
+```{r}
+set.seed(1848)
+x=sample(0:10,10,replace = T,prob = c(.2,.2,.3,.15,.05,.02,.02,.03,.005,.004,.01))
+y=sample(0:10,10,replace = T,prob = rep(1/11,11))
+z=sample(0:10,10,replace = T,c(.001,.05,.05,.09,.009,.1,.1,.15,.15,.1,.2))
+set.seed(26)
+x1<-sample(0:10,10,replace = T,prob = c(.2,.2,.3,.15,.05,.02,.02,.03,.005,.004,.01))
+y1<-sample(0:10,10,replace = T,prob = rep(1/11,11))
+z1<-sample(0:10,10,replace = T,c(.001,.05,.05,.09,.009,.1,.1,.15,.15,.1,.2))
+
+
+df1<-data.frame(College=rep(c('UW-Madison','Umich'),each=30),yr=rep(2017:2019,each=10,times=2),rating=c(x1,y1,z1,x,y,z)) %>% 
+  mutate(pos1=rating>3)
+
+
+
+p3<-df1 %>% 
+  mutate(pos=rating>3) %>% 
+  group_by(College,yr) %>%
+  summarize(rate=mean(pos)) %>%  
+  ggplot(aes(x=yr,y=rate,color=College))+geom_line(size=2)+
+  scale_color_manual(values=c('blue','red4'))+scale_x_continuous(breaks = 2017:2019)+
+  labs(x='Year',y='%',title = '% of Positive Sentiment Toward Colleges',caption = 'Disclaimer: Fabricated Data')+scale_y_continuous(labels=scales::percent,limits = c(0,1))+theme_minimal()
+
+p4<-df1 %>% group_by(College,yr) %>% 
+  summarize(rate=mean(rating)) %>% 
+  ggplot(aes(x=yr,y=rate,color=College))+geom_line(size=2)+
+  scale_x_continuous(breaks = 2017:2019)+
+   scale_color_manual(values=c('blue','red4'))+
+  labs(x='Year',y='Average Rating',title = 'Average Rating of Colleges',caption = 'Disclaimer: Fabricated Data')+theme_minimal()
+
+p3
+```
+The graph above shows changes in positive attitudes percent toward the University of Michigan and University of Wisconsin (as a disclaimer, the data is entirely fabricated :)!). We can see over time, there is a higher percentage of positive feeling towards UW-Madison when juxtapose with the University of Michigan. However, this graph may be a bit misleading. 
+
+```{r}
+knitr::kable(head(df1[-4]))
+```
+
+We can see through the snippet of the data that the actual table is of ratings for the colleges, not whether if there is a positive feeling toward a university. Actually if someone reverse engineers the graph, we can see the results actually show the number of ratings greater than 3 for a university for each year. Perhaps a better representation of the data would be average rating for each year: 
+
+```{r}
+p4
+```
+
+Now we can see in the last year of graph, Umich edges out in average ratings over UW-Madison! 
+
+Both of these graphs represent the same information, but represent and structure it differently. It is critical to keep in mind what would be the appropriate avenues in displaying the data. 
+
+### Perception 
+
+_“The more I see, the less I know for sure.”_
+  -- John Lennon 
+  
+Perception deals with how the human mind and eyes process geometric shapes and colors. A graph can look great and represent the data in an appropriate manner, but if something might be off with the hues or structure of the graphs, the effectiveness of the graph will be lost. 
+
+There are several examples of perception. Some of these will be covered in this section. 
+
+#### __Color__
+
+<center>
+
+![](124567310_395552468236788_917208697966361444_n.png)
+
+</center>
+
+A sequential color scale suggests an increase or intensity of a metric. In this graph, we can observe a sequential scale by looking at the map of urban population of the continental United States. 
+
+```{r}
+us_states <- map_data("state")
+USArrests$region<-tolower(rownames(USArrests))
+arrests<-us_states %>% left_join(USArrests)
+
+ggplot(data=subset(arrests, region %nin% "district of columbia"),aes(x = long, y = lat, group = group, fill = UrbanPop))+
+  geom_polygon(color = "gray90", size = 0.1) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45)+ 
+  theme_map() + labs(fill = "% Urban Population",title = 'Urban Population of the United States')+
+   theme(plot.title = element_text(size=22))
+```
+The brighter the color, the higher proportion of the population living in urban areas for each state. New York and California have the brightest colors, while states like Vermont and West Virginia are very dark. 
+
+A divergent color scheme suggests there is a midpoint of a metric, and differing colors are two ends of that metric. A map of a divergent color scale can be shown by looking at percentage of voting in the 2016 Presidential Election. 
+
+```{r}
+election$region <- tolower(election$state)
+us_states_elec <- left_join(us_states, election)
+
+p0 <- ggplot(data = subset(us_states_elec,
+                           region %nin% "district of columbia"),
+             aes(x = long, y = lat, group = group, fill = d_points))
+
+p1 <- p0 + geom_polygon(color = "gray90", size = 0.1) +
+    coord_map(projection = "albers", lat0 = 20, lat1 = 45) 
+
+p2 <- p1 + scale_fill_gradient2(low = scales::muted('red'),
+        
+                                high = scales::muted("blue")) +
+    labs(title = "Winning Margins of the the 2016 US Presidential Election") 
+p2 + theme_map() + labs(fill = "% Margin Won")
+```
+
+The more blue the color is, the more people voted for Hillary Clinton (California and New York), and the more red the color is, the more people voted for Donald Trump (West Virginia and Wyoming). States that are whiter in color suggests that the margins between the two candidates is very small. 
+
+Unordered color scale is simply grouping objects into categories. This can be shown by categorizing the states into geographical regions. 
+
+```{r}
+stateInfo<-data.frame(region=tolower(state.name),area=state.region)
+
+regions<-us_states %>% left_join(stateInfo)
+
+ggplot(data=subset(regions, region %nin% "district of columbia"),aes(x = long, y = lat, group = group, fill = area))+
+  geom_polygon(color = "gray90", size = 0.1) +
+    coord_map(projection = "albers", lat0 = 39, lat1 = 45)+ 
+  labs(title = 'US by Regions')+
+  theme_map() + labs(fill = "Region") + theme(plot.title = element_text(size=22))
+```
+
+
+
+#### __Size__
+<right>
+
+![](ch-01-cleveland-task-types.png) 
+
+</right>
+
+Studies suggest it is very difficult to accurately compare object size if the object is shaped into a circle. This may come as a shocker as pie charts are one of the most ubiquitous graphs out there. However, the usage of these can have deleterious effects! The picture above shows which graph types (from best to worst) are the easiest to compare sizes. 
+
+```{r}
+pop<-gapminder %>% filter(year==2007) %>% 
+  select(country,pop) %>% 
+  unique() %>% 
+  slice(1:10)
+pieGraph<-pop %>% 
+  arrange(desc(pop)) %>% 
+  ggplot(aes(x='',y=pop,fill=country)) +
+  geom_bar(stat = 'identity',width = 1,color='black')+
+   coord_polar("y", start=0)+theme_void()+
+  labs(title = 'Population of Countries in 2007')
+barGraph<-pop %>% 
+  ggplot(aes(x=reorder(country,pop),y=pop)) +
+  geom_col(fill='red4',color='black')+
+  coord_flip()+
+  labs(x='Country',y='population',title='Population of Countries in 2007',caption = 'Disclaimer: Fabricated Data')+scale_y_continuous(labels = comma)+theme_minimal()
+  
+grid.arrange(pieGraph,barGraph)
+```
+
+For the purpose of this example, let us assume that the countries in the graph constitutes for the total population of the world in 2007. In the pie chart, it is difficult to compare which country has a higher population. Countries such as Afghanistan and Algeria have very similar size slices in the pie. We can barely see Bahrain in this chart as well. 
+
+Comparing to the bar chart, it is much easier to compare size. We can easily see that Algeria has a higher population than Afghanistan. 
+
+#### __Gestalt Rules__
+
+Gestalt psychology is a school of psychology that posited that humans innately organize objects into groups. This is by certain rules: 
+
+* Proximity: Things that are spatially near to one another seem to be related.
+* Similarity: Things that look alike seem to be related.
+* Connection: Things that are visually tied to one another seem to be related.
+* Continuity: Partially hidden objects are completed into familiar shapes.
+* Closure: Incomplete shapes are perceived as complete.
+* Figure and Ground: Visual elements are taken to be either in the foreground or the background.
+* Common Fate: Elements sharing a direction of movement are perceived as a unit.
+
+We can observe several of these rules in this graph below: 
+
+```{r}
+set.seed(2)
+covfefe<-sample(1:100,10,replace = T)
+set.seed(3)
+yanny<-sample(1:100,10,replace = T)
+set.seed(4)
+laurel<-sample(1:100,10,replace = T)
+soundDat<-data.frame(sound=rep(c('covfefe','yanny','laurel'),each=10),yr=rep(c(2011:2020),times=3),rate=c(covfefe,yanny,laurel))
+
+soundDat %>% 
+  ggplot(aes(x=yr,y=rate,color=sound,shape=sound))+
+  geom_point(size=5)+scale_x_continuous(breaks = 2011:2020)+
+  labs(x='Year',y='US Citizens In Millions',title = 'What sound do you hear?',caption = 'Disclaimer: Fabricated Data')+geom_line(size=2)+theme_minimal()
+```
+
+Applying the similarity rule, shapes are the same must be connected. The connectivity rule also shows that that the dots are connected and suggests a trend. It is surprising to see that most people seem to hear covfefe the most! 
+
+## This is not a Doctrine of Good Data Visualization 
+
+Although the concepts above are good guidelines to follow when creating your first data visualization, it needs to be stressed that these rules are not the Bible of data visualizations. There are several examples of graphs and charts that break the rules, but prove to be effective in its goal. One famous example is the monster graph:
+
+![](ch-01-holmes-monstrous-only-1.png) 
+Although the graph is a bit slanted which makes the perception a bit off, and the use of a monster is anything but simple, the message is sent that congress campaign expenses have tremendously increased over the years. The graph is eye-catching that compels the reader to look at it and ponder whether campaign expenditures should really even be that high. 
+
+Another tip to think about is to think about who is going to be your audience. Are your readers going to be energetic school kids who need something stimulating to look at? Or is it going to be erudite scholars interested in the nitty-gritty details of a certain topic. Due diligence must be practice to produce good data visualization. 
+
+## Additional Resources 
+
+* [Data Visualization](https://socviz.co/index.html)
+* [Data Science for Fundraising - Learning R](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6787282/)
+* [Why is There So Much Study on Vision?](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6787282/)
+* [Gestalt Rules](https://www.verywellmind.com/gestalt-laws-of-perceptual-organization-2795835)

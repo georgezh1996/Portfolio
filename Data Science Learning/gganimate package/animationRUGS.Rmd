@@ -1,0 +1,156 @@
+---
+title: 'Data Viz: The Animation!'
+author: "George Zhou"
+output: 
+  html_document:
+    toc: yes
+    toc_depth: 4
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(message = FALSE, error = FALSE,
+                      warning = FALSE, fig.width = 8, fig.height = 6,fig.align = 'center')
+```
+
+
+```{r}
+library(gganimate) #featured package
+library(tidyverse) #contains ggplot
+library(gapminder) #data used in one of the examples
+library(lubridate) #function that works well with dates
+library(scales)    #works well with formatting numbers
+library(directlabels) #function here allows labeling points to be more efficient
+library(gifski) #package that can help create gifs 
+theme_set(theme_minimal())
+```
+
+
+### _"Life is action and not contemplation"_
+
+-Goethe
+
+## Introduction
+
+When referencing data visualizations in your standard meeting, the graphs/charts you present usually are static, much like being in stasis. However, there is a way to make your insipid visualizations pop out and have life: __Animated graphs__!!
+
+One way to enjoy this medium in R is utilizing the `gganimate` package. As the name suggests, you can combine gganimate functions with your ggplots!
+
+## The Grammar {.tabset .tabset-fade}
+
+Most functions in the gganimate package follow these templates: 
+
+* __transition_\*()__ defines how the data should be spread out and how it relates to itself across time.
+* __view_\*()__ defines how the positional scales should change along the animation
+* __shadow_\*()__ defines how data from other points in time should be presented in the given point in time
+* __enter_\*()/exit_\*()__ defines how new data should appear and how old data should disappear during the course of the animation.
+* __ease_aes()__ defines how different aesthetics should be eased during transitions
+
+Some examples are shown below: 
+
+### Creating a Narrative 
+
+One aspect that I found interesting using the gganimate package was being able to create a story by making effects more prominent. 
+
+COVID-19 has been a hot topic (obviously), which has generated many avid data scientists and data enthusiasts to try to create interesting visualizations. 
+
+The example here is inspired by [John Burn-Murdoch](https://twitter.com/jburnmurdoch/status/1347200811303055364). 
+
+```{r}
+#edit table and make it longer 
+# arrange for name and date for transition reveal 
+dat<- read_csv("AnimationInteraction/excess-mortality-raw-death-count.csv")
+US<-dat %>% 
+  filter(Code=='USA') %>% 
+  select(-c(Entity,Code,average_deaths_2015_2019_all_ages,deaths_2021_all_ages)) %>% 
+  pivot_longer(-Date) %>% 
+  filter(str_detect(Date,'2021')==F,Date!='2020-12-27',Date!='2020-12-20') %>% 
+  arrange(name,Date) %>% 
+  #frame variable creation
+  mutate(yr=str_extract(name,'[0-9]{4}'),frame=row_number())
+
+#can also change title of graph 
+p1 <- US %>%
+  ggplot(aes(x = Date, y = value, color = yr)) +
+  geom_line(size = 1.5) +
+  scale_color_discrete(name = 'Year') +
+  #transition reveal lets data gradually appear based on given time dimension, in this case it is the frame
+  transition_reveal(frame) +
+  #view follow changes the axis as the data present changes
+  # we fix the axis so it remains the same length
+  view_follow(fixed_x = T) +
+  #able to change the title based on the data
+  labs(title = "Deaths in Year: {US$yr[which(US$frame==frame_along)]}", y =
+         '# of Deaths', x = 'Coinciding Date') +
+  theme(plot.title = element_text(size = 22))+
+  scale_y_continuous(labels = comma)
+
+animate(p1,renderer = gifski_renderer(height = 640,width = 640), end_pause = 15,nframes = 200,fps=10)
+```
+
+This graph here shows the number of deaths for years 2015 to 2020 in the United States. Lines are created year by year to show that there was a huge upscale of deaths in 2020. The one crucial difference between 2020 and the other years was COVID-19. The disparity of deaths is shown even more by zooming out the axis when the 2020 line is generating. 
+
+### The Hidden Trend 
+
+Sometimes animation allows us to see patterns that we would not be able to see, or would require some effort in looking into. 
+
+The graph below shows the association of GDP per capita vs Life Expectancy in the Americas throughout the years. 
+
+```{r}
+p2 <- gapminder %>%
+  filter(continent == 'Americas') %>%
+  ggplot(aes(x = gdpPercap, y = lifeExp, color = country)) +
+  geom_point(aes(size = pop)) +
+  labs(title = 'GDP per capita vs Life Expectancy in Year: {frame_time}', x = 'GDP per capita', y = 'Life Expectancy in Years',caption = 'Size based on population') +
+  scale_size(range = c(2, 12)) +
+  geom_text(aes(label = country), nudge_y = 2) +
+  theme(legend.position = 'none') +
+  # transition time allows the data change based on the time period 
+  transition_time(year) +
+  #allows change to be linear, or steady 
+  ease_aes('linear')
+ animate(p2,renderer = gifski_renderer(height = 640,width = 640),end_pause = 15)
+```
+
+We can see that countries in Latin America shot up tremendously in life expectancy as GDP per capita increase. We can see for the United States and Canada, GDP per capita increased greatly as time went by, with little change in life expectancy. We also see that Trinidad and Tobago greatly increased their GDP per capita by its movement speed in the graph. 
+
+### Compare and Contrast 
+
+Another aspect when using gganimate is the ability to compare different trends. Take for example the unemployment rate of the United States (As a disclaimer, the unemployment rate is calculated by the dividing the total number of unemployed people by the population of the United States, which is not the traditional definition of an unemployment rate). 
+
+```{r}
+ec<-economics %>% 
+  mutate(monthDay=(format(date,'%m-%d')),yr=year(date),unemp=unemploy/pop) %>% 
+  filter(yr %in% c(2000:2014)) %>% 
+  mutate(x=as.numeric(str_extract(monthDay,'[0-9]{2}')))
+p3<-ec %>% 
+  ggplot(aes(x=x,y=unemp))+
+  geom_line(color='red',size=1.5)+
+  #label lines only once
+  geom_dl(aes(label=factor(yr)),method = list(dl.trans(x = x -.28, y = y + 0.25), "last.points", fontface = "bold"))+
+  #transition state is a more static version of transition time, the changes are more abrupt  
+  transition_states(factor(yr))+
+  # lines with older years will be grayed out and thinner
+  shadow_mark(color='gray',size=.5)+
+  #new data will fade in 
+  scale_x_continuous(labels=month.abb,breaks=1:12)+
+  scale_y_continuous(labels = scales::percent)+
+  labs(y='Unemployment Rate', x='Month',title='US Unemployment Rate')
+animate(p3,renderer = gifski_renderer(height = 640,width = 640),nframes = 200,fps = 10)
+```
+
+The unemployment rate shoots up during 2008-2009, during the peak of the Great Recession. Graying and minimizing out the other lines allow us to compare the trend of unemployment to other years. 
+
+## With Great Power Comes with Great Responsibility
+
+Even though gganimate is such a useful and fun package, it does not mean you should use it for __ALL__ of your data visualizations. For one thing, generating all your animations may take significant processing power. 
+
+On a serious note, it is important to understand that animated graphs has its time and purpose. Using these types of graph all the time might make the visual experience convoluted and messy. Please use animations sparingly :). 
+
+## Additional Resources 
+
+* [gganimate](https://gganimate.com/): Good start in learning about gganimate package
+* [R Graph Gallery](https://www.r-graph-gallery.com/animation.html): Intros to other animation packages
+* [plotly](https://plotly.com/r/): Another popular animation package
+* [R for Data Science](https://r4ds.had.co.nz/): Book that gives basic rundown in using ggplot 

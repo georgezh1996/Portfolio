@@ -1,0 +1,177 @@
+---
+title: "stringr"
+author: "George Zhou"
+output: 
+  html_document:
+    toc: yes
+    toc_depth: 4
+    toc_float: true
+---
+
+*Presented 6/19/2020*
+
+## Introduction
+
+The library stringr created to work with/manipulate strings in R. It is a wrapper of the library *stringi*, which uses ICU C library to provide fast, easy, and correct implementation functions.
+
+stringr is a core library in the *tidyverse* world. You just need to install tidyverse to be able to enjoy stringr!  
+
+## So what can stringr actually do? {.tabset .tabset-fade}
+
+A lot actually. Here are some examples of functions in the stringr package. 
+
+### str_count
+
+[str_count](https://www.rdocumentation.org/packages/stringr/versions/1.4.0/topics/str_count) counts the number of strings that contain a match with the pattern given. 
+```{r include=F}
+library(tidyverse)
+library(ggbeeswarm)
+```
+
+
+```{r}
+string='I love R so so much. R is the best thing since sliced bread. Would you agree with me that R is the greatest thing that has happened to you?'
+pattern='R'
+str_count(string,pattern)
+```
+
+You are also able to use regex patterns.
+
+```{r}
+#How many capital words are there? 
+string='One fish, Two fish, Red fish, Blue fish. Black fish, Blue fish, Old fish, New fish.'
+pattern='[A-Z]'
+str_count(string,pattern)
+```
+
+
+### str_replace_all
+
+[str_replace_all](https://www.rdocumentation.org/packages/stringr/versions/1.4.0/topics/str_replace) Replaces all matched patterns within each string.
+
+There is also a [str_replace](https://www.rdocumentation.org/packages/stringr/versions/1.4.0/topics/str_replace) function that replaces the first matched pattern in a string. 
+
+```{r }
+string='I am a proud Wolverine. I will forever and always be a Wolverine. Wolverines for life!'
+pattern='Wolverine'
+replacement='Badger'
+str_replace_all(string,pattern,replacement)
+#str_replace only changes the first match
+str_replace(string,pattern,replacement)
+```
+
+```{r}
+string1='He is pretty cool. She is pretty cool. Kanye is pretty cool.'
+pattern1='[A-Z]{1}[a-z]*'
+replacement1='George'
+str_replace_all(string1,pattern1,replacement1)
+```
+
+### str_split_fixed
+
+[str_split_fixed](https://www.rdocumentation.org/packages/stringr/versions/0.6.2/topics/str_split_fixed) splits a vector of strings into a matrix of substrings. 
+
+```{r}
+string=c('Sam Sung','Joe King','Horace Cope','Chandler Eere','Walter Slide','Ray Sing','Al E. Gator')
+#n is number of pieces to return 
+pattern=' '
+str_split_fixed(string,pattern,n=2)
+```
+
+### str_detect and str_which, str_extract_all
+
+[str_detect](https://www.rdocumentation.org/packages/stringr/versions/1.4.0/topics/str_detect) and [str_which](https://www.rdocumentation.org/packages/stringr/versions/1.4.0) perform similar functions as grepl and grep respectively. 
+
+[str_extract_all](https://www.rdocumentation.org/packages/stringr/versions/0.6.2/topics/str_extract) will pull the texts that matched with the pattern. 
+
+```{r}
+string=c('Never ever!','Gonna get some cookies!','Give it to me!','You are awesome!','Up up and away!')
+pattern='^[A-Z]{1}[a-z]*'
+#is there a first word that is capitalized? 
+str_detect(string,pattern)
+#which strings has a capital first word?
+str_which(string,pattern)
+#extracts the matched word 
+str_extract(string,pattern)
+```
+
+## So why stringr? {.tabset .tabset-fade}
+
+stringr offers functions that may have already been covered in base R. So why use it? 
+
+### Speed
+
+One reason to use stringr over base R is the processing speed is much faster. 
+
+In this example, we will using vector sentences, which is a vector of sentences.
+
+```{r}
+head(sentences)
+```
+
+
+```{r}
+results=bench::mark(
+  base=grep('The',sentences),
+  stringr=str_which(sentences,'The'),iterations = 1000,time_unit = 's')
+results
+dat=data.frame(Method=c(rep('base',1000),rep('stringr',1000)),Time=c(results$time[[1]],results$time[[2]]))
+ggplot(dat,aes(Method,Time))+
+  geom_quasirandom(aes(color=Method))+
+  scale_y_log10(name='Time (Seconds)')+
+  scale_color_manual(values=c('red4','steelblue1'))+
+  ggtitle("Time Distribution based on Method")+
+  theme_minimal()+
+  theme(legend.position = 'none')
+```
+
+*us* is microseconds, which equals .001 milliseconds (ms).
+
+### Simplicity
+
+Another reason to use stringr functions is the syntax is simpler in some cases, such as when piping. 
+```{r,results='hide'}
+new=sentences%>%str_detect('The')
+#compared to 
+old=sentences%>%grepl('The',.)
+```
+
+Many tasks that you would want to do in base R might need extra steps, whereas in stringr, you only need to use one function. 
+
+```{r}
+string=c("Thank goodness it is Friday! Friday is the best day in the world! Mondays are superior!")
+pattern='Friday'
+string1=unlist(strsplit(string,split ="!"))
+sum(grepl(pattern,string1))
+
+#same results, less code needed
+str_count(string,pattern)
+```
+
+### Times where Base might be better
+
+There are times where you may want to use base R instead. In some cases, stringr functions need helper functions to do its tasks properly. Base functions have built in arguments so there is no need for helper functions
+
+```{r}
+#Exact matched cases
+string=c('Yay.Friday','Yay it is Friday!')
+pattern='Yay.Friday'
+
+grepl(pattern,string,fixed = T)
+
+#same results, helper function needed
+str_detect(string,fixed(pattern))
+```
+
+## Conclusion
+
+* stringr is a library enclosed in tidyverse built to make string manipulation easy
+* Advantages in using stringr is usability, speed, and efficiency
+* Disadvantages include not being versatile and need of helper functions in some cases 
+    
+## Resources 
+
+* [stringr website](https://stringr.tidyverse.org/) (includes stringr cheat sheet!)
+* [regex documentation](https://rstudio.com/wp-content/uploads/2016/09/RegExCheatsheet.pdf) 
+* [R for Data Science Strings Chapter](https://r4ds.had.co.nz/strings.html)
+* [stringi Documentation](https://cran.r-project.org/web/packages/stringi/index.html)
